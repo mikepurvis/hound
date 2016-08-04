@@ -44,19 +44,35 @@ func (g *GitDriver) HeadRev(dir string) (string, error) {
 	return strings.TrimSpace(buf.String()), cmd.Wait()
 }
 
-func (g *GitDriver) Pull(dir string) (string, error) {
-	cmd := exec.Command("git", "pull")
+func (g *GitDriver) Pull(dir string, url string, ref string) (string, error) {
+	cmd := exec.Command("git", "remote", "set-url", "origin", url)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("Failed to git pull %s, see output below\n%sContinuing...", dir, out)
+		log.Printf("Failed to set git origin for %s, see output below\n%sContinuing...", dir, out)
+		return "", err
+	}
+
+	cmd = exec.Command("git", "fetch", "--prune", "--no-tags", "--depth", "1", "origin", "+" + ref + ":remotes/origin/" + ref)
+	cmd.Dir = dir
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to git fetch  %s, see output below\n%sContinuing...", dir, out)
+		return "", err
+	}
+
+	cmd = exec.Command("git", "reset", "--hard", "origin/" + ref)
+	cmd.Dir = dir
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to set git origin for %s, see output below\n%sContinuing...", dir, out)
 		return "", err
 	}
 
 	return g.HeadRev(dir)
 }
 
-func (g *GitDriver) Clone(dir, url string, ref string) (string, error) {
+func (g *GitDriver) Clone(dir string, url string, ref string) (string, error) {
 	par, rep := filepath.Split(dir)
 	cmd := exec.Command(
 		"git",
